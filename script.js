@@ -13,8 +13,6 @@ let p1Score = 0, p2Score = 0;
 let currentPlayer = 1;
 let currentTurnTiles = []; 
 let moveHistory = []; 
-
-// NEW: Tracks which tile is clicked in the rack
 let selectedRackTile = null;
 
 function initBoard() {
@@ -27,12 +25,9 @@ function initBoard() {
             cell.id = `c-${r}-${c}`;
             cell.innerText = bonusClass.toUpperCase();
             
-            // Drag Events
             cell.ondragover = e => { e.preventDefault(); cell.classList.add('hover'); };
             cell.ondragleave = () => cell.classList.remove('hover');
             cell.ondrop = e => handleDrop(e, r, c);
-            
-            // NEW: Click Event for placing tiles
             cell.onclick = () => handleCellClick(r, c);
             
             board.appendChild(cell);
@@ -44,7 +39,7 @@ function generateTiles() {
     const input = document.getElementById('tileInput').value; 
     const rack = document.getElementById('rack');
     rack.innerHTML = '';
-    selectedRackTile = null; // Clear selection when generating new tiles
+    selectedRackTile = null; 
 
     [...input].forEach((char, index) => {
         const upperChar = char.toUpperCase();
@@ -60,7 +55,6 @@ function generateTiles() {
         
         if (isBlank) tile.dataset.isBlank = "true";
 
-        // Dragging logic
         tile.ondragstart = e => {
             e.dataTransfer.setData("text/plain", upperChar);
             e.dataTransfer.setData("tileId", tile.id);
@@ -69,19 +63,15 @@ function generateTiles() {
         };
         tile.ondragend = e => e.target.style.opacity = "1";
 
-        // NEW: Click to select logic
         tile.onclick = () => {
-            // Remove highlight from any previously selected tile
             if (selectedRackTile) {
                 const prevTile = document.getElementById(selectedRackTile.id);
                 if (prevTile) prevTile.classList.remove('selected-tile');
             }
 
-            // If you click the same tile twice, deselect it
             if (selectedRackTile && selectedRackTile.id === tile.id) {
                 selectedRackTile = null;
             } else {
-                // Otherwise, select this tile
                 selectedRackTile = { id: tile.id, char: upperChar, isBlank: isBlank };
                 tile.classList.add('selected-tile');
             }
@@ -91,39 +81,48 @@ function generateTiles() {
     });
 }
 
-// Handles placing a tile by clicking
+// Mobile-friendly double-tap sensor
+function attachDoubleTapToRemove(boardTile, cell, r, c) {
+    let lastTap = 0;
+    boardTile.onclick = function(e) {
+        e.stopPropagation(); // Stops the click from transferring to the empty cell beneath it
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        
+        if (tapLength < 500 && tapLength > 0) { // 500ms window for a double tap
+            cell.removeChild(boardTile);
+            currentTurnTiles = currentTurnTiles.filter(t => t.r !== r || t.c !== c);
+        }
+        lastTap = currentTime;
+    };
+}
+
 function handleCellClick(r, c) {
-    if (!selectedRackTile) return; // Do nothing if no tile is selected
+    if (!selectedRackTile) return; 
 
     const cell = document.getElementById(`c-${r}-${c}`);
     if (cell.querySelector('.tile')) {
-        // Cell already has a tile, deselect
         document.getElementById(selectedRackTile.id)?.classList.remove('selected-tile');
         selectedRackTile = null;
         return; 
     }
 
-    // Place the tile exactly like the drop function does
     const boardTile = document.createElement('div');
     boardTile.className = selectedRackTile.isBlank ? 'tile blank-tile' : 'tile';
     boardTile.innerText = selectedRackTile.char;
     if (selectedRackTile.isBlank) boardTile.dataset.isBlank = "true";
     
-    boardTile.ondblclick = function() {
-        cell.removeChild(boardTile);
-        currentTurnTiles = currentTurnTiles.filter(t => t.r !== r || t.c !== c);
-    };
+    // Attach new double-tap logic
+    attachDoubleTapToRemove(boardTile, cell, r, c);
 
     cell.appendChild(boardTile);
     currentTurnTiles.push({ char: selectedRackTile.char, r, c, isBlank: selectedRackTile.isBlank });
 
-    // Remove from rack and clear selection
     const rackTile = document.getElementById(selectedRackTile.id);
     if(rackTile) rackTile.remove();
     selectedRackTile = null;
 }
 
-// Handles placing a tile by dragging
 function handleDrop(e, r, c) {
     e.preventDefault();
     const char = e.dataTransfer.getData("text/plain");
@@ -139,10 +138,8 @@ function handleDrop(e, r, c) {
     boardTile.innerText = char;
     if (isBlank) boardTile.dataset.isBlank = "true";
     
-    boardTile.ondblclick = function() {
-        cell.removeChild(boardTile);
-        currentTurnTiles = currentTurnTiles.filter(t => t.r !== r || t.c !== c);
-    };
+    // Attach new double-tap logic
+    attachDoubleTapToRemove(boardTile, cell, r, c);
 
     cell.appendChild(boardTile);
     currentTurnTiles.push({ char, r, c, isBlank });
@@ -150,7 +147,6 @@ function handleDrop(e, r, c) {
     const rackTile = document.getElementById(tileId);
     if(rackTile) rackTile.remove();
     
-    // Clear selection if they dragged a tile that was clicked
     if (selectedRackTile && selectedRackTile.id === tileId) {
         selectedRackTile = null;
     }
@@ -280,7 +276,7 @@ function calculateTurn() {
     currentTurnTiles.forEach(tile => {
         const lockedTile = document.getElementById(`c-${tile.r}-${tile.c}`).querySelector('.tile');
         if(lockedTile) {
-            lockedTile.ondblclick = null;
+            lockedTile.onclick = null; // Removes the double-tap to delete once scored
             lockedTile.style.cursor = 'default';
         }
     });
@@ -326,6 +322,7 @@ function undoLastMove() {
     document.getElementById('box-2').classList.toggle('active-p2', currentPlayer === 2);
 }
 
+// Restored to the online API checker
 async function checkDictionary() {
     const rawInput = document.getElementById('checkWordInput').value.trim();
     const searchWord = rawInput.toLowerCase();
