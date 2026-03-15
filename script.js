@@ -12,7 +12,10 @@ const bonuses = {
 let p1Score = 0, p2Score = 0;
 let currentPlayer = 1;
 let currentTurnTiles = []; 
-let moveHistory = []; // NEW: Tracks history for the Undo feature
+let moveHistory = []; 
+
+// NEW: Tracks which tile is clicked in the rack
+let selectedRackTile = null;
 
 function initBoard() {
     const board = document.getElementById('board');
@@ -24,9 +27,14 @@ function initBoard() {
             cell.id = `c-${r}-${c}`;
             cell.innerText = bonusClass.toUpperCase();
             
+            // Drag Events
             cell.ondragover = e => { e.preventDefault(); cell.classList.add('hover'); };
             cell.ondragleave = () => cell.classList.remove('hover');
             cell.ondrop = e => handleDrop(e, r, c);
+            
+            // NEW: Click Event for placing tiles
+            cell.onclick = () => handleCellClick(r, c);
+            
             board.appendChild(cell);
         }
     }
@@ -36,6 +44,8 @@ function generateTiles() {
     const input = document.getElementById('tileInput').value; 
     const rack = document.getElementById('rack');
     rack.innerHTML = '';
+    selectedRackTile = null; // Clear selection when generating new tiles
+
     [...input].forEach((char, index) => {
         const upperChar = char.toUpperCase();
         if (!letterValues[upperChar]) return; 
@@ -50,6 +60,7 @@ function generateTiles() {
         
         if (isBlank) tile.dataset.isBlank = "true";
 
+        // Dragging logic
         tile.ondragstart = e => {
             e.dataTransfer.setData("text/plain", upperChar);
             e.dataTransfer.setData("tileId", tile.id);
@@ -57,10 +68,62 @@ function generateTiles() {
             setTimeout(() => tile.style.opacity = "0.4", 0);
         };
         tile.ondragend = e => e.target.style.opacity = "1";
+
+        // NEW: Click to select logic
+        tile.onclick = () => {
+            // Remove highlight from any previously selected tile
+            if (selectedRackTile) {
+                const prevTile = document.getElementById(selectedRackTile.id);
+                if (prevTile) prevTile.classList.remove('selected-tile');
+            }
+
+            // If you click the same tile twice, deselect it
+            if (selectedRackTile && selectedRackTile.id === tile.id) {
+                selectedRackTile = null;
+            } else {
+                // Otherwise, select this tile
+                selectedRackTile = { id: tile.id, char: upperChar, isBlank: isBlank };
+                tile.classList.add('selected-tile');
+            }
+        };
+
         rack.appendChild(tile);
     });
 }
 
+// Handles placing a tile by clicking
+function handleCellClick(r, c) {
+    if (!selectedRackTile) return; // Do nothing if no tile is selected
+
+    const cell = document.getElementById(`c-${r}-${c}`);
+    if (cell.querySelector('.tile')) {
+        // Cell already has a tile, deselect
+        document.getElementById(selectedRackTile.id)?.classList.remove('selected-tile');
+        selectedRackTile = null;
+        return; 
+    }
+
+    // Place the tile exactly like the drop function does
+    const boardTile = document.createElement('div');
+    boardTile.className = selectedRackTile.isBlank ? 'tile blank-tile' : 'tile';
+    boardTile.innerText = selectedRackTile.char;
+    if (selectedRackTile.isBlank) boardTile.dataset.isBlank = "true";
+    
+    boardTile.ondblclick = function() {
+        cell.removeChild(boardTile);
+        currentTurnTiles = currentTurnTiles.filter(t => t.r !== r || t.c !== c);
+    };
+
+    cell.appendChild(boardTile);
+    currentTurnTiles.push({ char: selectedRackTile.char, r, c, isBlank: selectedRackTile.isBlank });
+
+    // Remove from rack and clear selection
+    const rackTile = document.getElementById(selectedRackTile.id);
+    if(rackTile) rackTile.remove();
+    selectedRackTile = null;
+}
+
+// Handles placing a tile by dragging
 function handleDrop(e, r, c) {
     e.preventDefault();
     const char = e.dataTransfer.getData("text/plain");
@@ -86,6 +149,11 @@ function handleDrop(e, r, c) {
 
     const rackTile = document.getElementById(tileId);
     if(rackTile) rackTile.remove();
+    
+    // Clear selection if they dragged a tile that was clicked
+    if (selectedRackTile && selectedRackTile.id === tileId) {
+        selectedRackTile = null;
+    }
 }
 
 function switchPlayer() {
@@ -163,7 +231,7 @@ function calculateTurn() {
     
     if (primaryWord.length > 1 || currentTurnTiles.length === 1) {
         let s = scoreWord(primaryWord);
-        if (s >= 0) { // FIXED: >= 0 so blank words still log!
+        if (s >= 0) { 
             turnTotal += s;
             wordsFormed.push(formatWordLog(primaryWord));
         }
@@ -189,11 +257,10 @@ function calculateTurn() {
     const p2Name = document.getElementById('p2Name').value || "Player 2";
     const activeName = currentPlayer === 1 ? p1Name : p2Name;
 
-    // Save move to history BEFORE updating scores and clearing arrays
     moveHistory.push({
         player: currentPlayer,
         score: turnTotal,
-        tiles: [...currentTurnTiles] // clone the array of tiles placed
+        tiles: [...currentTurnTiles] 
     });
 
     if (currentPlayer === 1) {
@@ -221,20 +288,18 @@ function calculateTurn() {
     currentTurnTiles = [];
     document.getElementById('tileInput').value = '';
     document.getElementById('rack').innerHTML = '';
+    selectedRackTile = null;
     switchPlayer();
 }
 
-// NEW FUNCTION: Undo the last recorded move
 function undoLastMove() {
     if (moveHistory.length === 0) {
         alert("No moves to undo!");
         return;
     }
 
-    // 1. Get the last move data and remove it from history
     const lastMove = moveHistory.pop();
 
-    // 2. Subtract the score from the correct player
     if (lastMove.player === 1) {
         p1Score -= lastMove.score;
         document.getElementById('s1').innerText = p1Score;
@@ -243,7 +308,6 @@ function undoLastMove() {
         document.getElementById('s2').innerText = p2Score;
     }
 
-    // 3. Physically remove those tiles from the board
     lastMove.tiles.forEach(t => {
         const cell = document.getElementById(`c-${t.r}-${t.c}`);
         const tileDiv = cell.querySelector('.tile');
@@ -252,13 +316,11 @@ function undoLastMove() {
         }
     });
 
-    // 4. Remove the top entry from the Game Log
     const logDiv = document.getElementById('gameLog');
     if (logDiv.firstElementChild) {
         logDiv.removeChild(logDiv.firstElementChild);
     }
 
-    // 5. Give the turn back to the player who made the undone move
     currentPlayer = lastMove.player;
     document.getElementById('box-1').classList.toggle('active-p1', currentPlayer === 1);
     document.getElementById('box-2').classList.toggle('active-p2', currentPlayer === 2);
@@ -298,5 +360,4 @@ async function checkDictionary() {
     }
 }
 
-// Initialize the board when the script loads
 initBoard();
