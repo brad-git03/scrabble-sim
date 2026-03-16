@@ -14,11 +14,15 @@
         <div class="score-card">
             <div id="box-1" class="player-box active-p1">
                 <input type="text" id="p1Name" class="name-input" value="Player 1">
-                <div id="s1" style="font-size: 28px; font-weight: 900;">0</div>
+                <div id="s1" style="font-size: 24px; font-weight: 900;">0</div>
             </div>
             <div id="box-2" class="player-box">
                 <input type="text" id="p2Name" class="name-input" value="Player 2">
-                <div id="s2" style="font-size: 28px; font-weight: 900;">0</div>
+                <div id="s2" style="font-size: 24px; font-weight: 900;">0</div>
+            </div>
+            <div id="box-3" class="player-box">
+                <input type="text" id="p3Name" class="name-input" value="Player 3">
+                <div id="s3" style="font-size: 24px; font-weight: 900;">0</div>
             </div>
         </div>
         
@@ -26,6 +30,7 @@
             <button class="btn-switch" onclick="switchPlayer()">Switch Turn</button>
             <button class="btn-score" onclick="calculateTurn()">Score Move</button>
         </div>
+        
         <button onclick="undoLastMove()" style="width: 100%; margin-top: 8px; background: #e74c3c; color: white; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Undo Last Move</button>
         
         <div class="log" id="gameLog"></div>
@@ -36,7 +41,7 @@
         <span class="hint">Use <b>UPPERCASE</b> for normal tiles.<br>Use <b>lowercase</b> for blanks (e.g. "cAT").</span>
         <input type="text" id="tileInput" placeholder="Type letters..." oninput="generateTiles()">
         <div id="rack"></div>
-        <span class="hint" style="margin-top: 5px; text-align: center;">*Double-click a placed tile to remove it.</span>
+        <span class="hint" style="margin-top: 5px; text-align: center;">*Double-tap a placed tile to remove it.</span>
     </div>
 
     <div class="panel">
