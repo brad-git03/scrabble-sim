@@ -4,14 +4,12 @@ const bonuses = {
     '0,0':'tw', '0,7':'tw', '0,14':'tw', '7,0':'tw', '7,14':'tw', '14,0':'tw', '14,7':'tw', '14,14':'tw',
     '1,1':'dw', '2,2':'dw', '3,3':'dw', '4,4':'dw', '13,13':'dw', '12,12':'dw', '11,11':'dw', '10,10':'dw',
     '1,13':'dw', '2,12':'dw', '3,11':'dw', '4,10':'dw', '13,1':'dw', '12,2':'dw', '11,3':'dw', '10,4':'dw', 
-    /* Notice that '7,7':'dw' has been removed from the line above! */
     '1,5':'tl', '1,9':'tl', '5,1':'tl', '5,5':'tl', '5,9':'tl', '5,13':'tl', '9,1':'tl', '9,5':'tl', '9,9':'tl', '9,13':'tl', '13,5':'tl', '13,9':'tl',
     '0,3':'dl', '0,11':'dl', '2,6':'dl', '2,8':'dl', '3,0':'dl', '3,7':'dl', '3,14':'dl', '6,2':'dl', '6,6':'dl', '6,8':'dl', '6,12':'dl',
     '7,3':'dl', '7,11':'dl', '8,2':'dl', '8,6':'dl', '8,8':'dl', '8,12':'dl', '11,0':'dl', '11,7':'dl', '11,14':'dl', '12,6':'dl', '12,8':'dl', '14,3':'dl', '14,11':'dl'
 };
 
-
-let p1Score = 0, p2Score = 0;
+let p1Score = 0, p2Score = 0, p3Score = 0; // Added 3rd player score
 let currentPlayer = 1;
 let currentTurnTiles = []; 
 let moveHistory = []; 
@@ -83,15 +81,14 @@ function generateTiles() {
     });
 }
 
-// Mobile-friendly double-tap sensor
 function attachDoubleTapToRemove(boardTile, cell, r, c) {
     let lastTap = 0;
     boardTile.onclick = function(e) {
-        e.stopPropagation(); // Stops the click from transferring to the empty cell beneath it
+        e.stopPropagation(); 
         const currentTime = new Date().getTime();
         const tapLength = currentTime - lastTap;
         
-        if (tapLength < 500 && tapLength > 0) { // 500ms window for a double tap
+        if (tapLength < 500 && tapLength > 0) { 
             cell.removeChild(boardTile);
             currentTurnTiles = currentTurnTiles.filter(t => t.r !== r || t.c !== c);
         }
@@ -114,7 +111,6 @@ function handleCellClick(r, c) {
     boardTile.innerText = selectedRackTile.char;
     if (selectedRackTile.isBlank) boardTile.dataset.isBlank = "true";
     
-    // Attach new double-tap logic
     attachDoubleTapToRemove(boardTile, cell, r, c);
 
     cell.appendChild(boardTile);
@@ -140,7 +136,6 @@ function handleDrop(e, r, c) {
     boardTile.innerText = char;
     if (isBlank) boardTile.dataset.isBlank = "true";
     
-    // Attach new double-tap logic
     attachDoubleTapToRemove(boardTile, cell, r, c);
 
     cell.appendChild(boardTile);
@@ -155,9 +150,14 @@ function handleDrop(e, r, c) {
 }
 
 function switchPlayer() {
-    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    // Cycles 1 -> 2 -> 3 -> 1
+    if (currentPlayer === 1) currentPlayer = 2;
+    else if (currentPlayer === 2) currentPlayer = 3;
+    else currentPlayer = 1;
+
     document.getElementById('box-1').classList.toggle('active-p1', currentPlayer === 1);
     document.getElementById('box-2').classList.toggle('active-p2', currentPlayer === 2);
+    document.getElementById('box-3').classList.toggle('active-p3', currentPlayer === 3);
 }
 
 function getTileAt(r, c) {
@@ -253,7 +253,12 @@ function calculateTurn() {
 
     const p1Name = document.getElementById('p1Name').value || "Player 1";
     const p2Name = document.getElementById('p2Name').value || "Player 2";
-    const activeName = currentPlayer === 1 ? p1Name : p2Name;
+    const p3Name = document.getElementById('p3Name').value || "Player 3";
+    
+    let activeName;
+    if (currentPlayer === 1) activeName = p1Name;
+    else if (currentPlayer === 2) activeName = p2Name;
+    else activeName = p3Name;
 
     moveHistory.push({
         player: currentPlayer,
@@ -264,9 +269,12 @@ function calculateTurn() {
     if (currentPlayer === 1) {
         p1Score += turnTotal;
         document.getElementById('s1').innerText = p1Score;
-    } else {
+    } else if (currentPlayer === 2) {
         p2Score += turnTotal;
         document.getElementById('s2').innerText = p2Score;
+    } else {
+        p3Score += turnTotal;
+        document.getElementById('s3').innerText = p3Score;
     }
 
     const logEntry = `<div style="margin-bottom: 5px; border-bottom: 1px dashed #747d8c; padding-bottom: 5px;">
@@ -278,7 +286,7 @@ function calculateTurn() {
     currentTurnTiles.forEach(tile => {
         const lockedTile = document.getElementById(`c-${tile.r}-${tile.c}`).querySelector('.tile');
         if(lockedTile) {
-            lockedTile.onclick = null; // Removes the double-tap to delete once scored
+            lockedTile.onclick = null; 
             lockedTile.style.cursor = 'default';
         }
     });
@@ -301,9 +309,12 @@ function undoLastMove() {
     if (lastMove.player === 1) {
         p1Score -= lastMove.score;
         document.getElementById('s1').innerText = p1Score;
-    } else {
+    } else if (lastMove.player === 2) {
         p2Score -= lastMove.score;
         document.getElementById('s2').innerText = p2Score;
+    } else {
+        p3Score -= lastMove.score;
+        document.getElementById('s3').innerText = p3Score;
     }
 
     lastMove.tiles.forEach(t => {
@@ -322,9 +333,9 @@ function undoLastMove() {
     currentPlayer = lastMove.player;
     document.getElementById('box-1').classList.toggle('active-p1', currentPlayer === 1);
     document.getElementById('box-2').classList.toggle('active-p2', currentPlayer === 2);
+    document.getElementById('box-3').classList.toggle('active-p3', currentPlayer === 3);
 }
 
-// Restored to the online API checker
 async function checkDictionary() {
     const rawInput = document.getElementById('checkWordInput').value.trim();
     const searchWord = rawInput.toLowerCase();
